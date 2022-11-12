@@ -19,13 +19,13 @@ SSD1306Wire oled(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED); /
 
 char txpacket[BUFFER_SIZE];
 char rxpacket[BUFFER_SIZE];
-double txNumber;
-bool lora_idle = true;
 static RadioEvents_t RadioEvents;
-void OnTxDone( void );
-void OnTxTimeout( void );
+int16_t txNumber;
+int16_t rssi, rxSize;
+bool lora_idle = true;
 
 void setup() {
+
   Serial.begin(115200);
   delay(100);
 
@@ -37,51 +37,45 @@ void setup() {
   Mcu.begin();
 
   txNumber = 0;
+  rssi = 0;
 
-  RadioEvents.TxDone = OnTxDone;
-  RadioEvents.TxTimeout = OnTxTimeout;
-
+  RadioEvents.RxDone = OnRxDone;
   Radio.Init( &RadioEvents );
   Radio.SetChannel( RF_FREQUENCY );
-  Radio.SetTxConfig( MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
-                     LORA_SPREADING_FACTOR, LORA_CODINGRATE,
-                     LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON,
-                     true, 0, 0, LORA_IQ_INVERSION_ON, 3000 );
+  Radio.SetRxConfig( MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
+                     LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
+                     LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON,
+                     0, true, 0, 0, LORA_IQ_INVERSION_ON, true );
 }
-
 
 
 void loop()
 {
-  if (lora_idle == true)
+  if (lora_idle)
   {
-    delay(1000);
-    txNumber += 0.01;
-    sprintf(txpacket, "{ \"Nível\": \"%0.2f\"}", txNumber); //start a package
-
-    Serial.printf("\r\nsending packet \"%s\" , length %d\r\n", txpacket, strlen(txpacket));
-
-    Radio.Send( (uint8_t *)txpacket, strlen(txpacket) ); //send the package out
     lora_idle = false;
+    Serial.println("into RX mode");
+    Radio.Rx(0);
   }
   Radio.IrqProcess( );
+
 }
 
-void OnTxDone( void )
+void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
 {
-  Serial.println("TX done......");
+  rssi = rssi;
+  rxSize = size;
+  memcpy(rxpacket, payload, size );
+  rxpacket[size] = '\0';
+  Radio.Sleep( );
+  Serial.printf("\r\nPacote Recebido \"%s\" with rssi %d , length %d\r\n", rxpacket, rssi, rxSize);
   lora_idle = true;
   oled.clear();
   oled.setFont(ArialMT_Plain_10);
   oled.setTextAlignment(TEXT_ALIGN_LEFT);
-  oled.drawStringMaxWidth(0, 0, 128,"Pacote enviado:");
-  oled.drawStringMaxWidth(0, 13, 128,String(txpacket) );
+  oled.drawStringMaxWidth(0, 0, 128,"Pacote Recebido:");
+  oled.drawStringMaxWidth(0, 13, 128,String(rxpacket) );
+  oled.drawStringMaxWidth(0, 26, 128,"RSSi: " + String(rssi) );
+  oled.drawStringMaxWidth(0, 39, 128,"Tamanho: " + String(rxSize) );
   oled.display();
-}
-
-void OnTxTimeout( void )
-{
-  Radio.Sleep( );
-  Serial.println("TX Timeout......");
-  lora_idle = true;
 }
