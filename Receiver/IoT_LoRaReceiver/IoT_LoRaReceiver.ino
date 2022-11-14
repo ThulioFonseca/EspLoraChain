@@ -17,6 +17,10 @@ SSD1306Wire oled(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED); /
 #define RX_TIMEOUT_VALUE           1000
 #define BUFFER_SIZE                30 // Define the payload size here
 
+#define I2C_DEV_ADDR 0x08
+#define I2C_SDA 33
+#define I2C_SCL 34
+
 char txpacket[BUFFER_SIZE];
 char rxpacket[BUFFER_SIZE];
 static RadioEvents_t RadioEvents;
@@ -27,7 +31,9 @@ bool lora_idle = true;
 void setup() {
 
   Serial.begin(115200);
+  Wire1.begin(I2C_SDA,I2C_SCL);
   delay(100);
+ 
 
   // Initialising the UI will init the display too.
   oled.init();
@@ -70,6 +76,13 @@ void OnRxDone( uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr )
   Radio.Sleep( );
   Serial.printf("\r\nPacote Recebido \"%s\" with rssi %d , length %d\r\n", rxpacket, rssi, rxSize);
   lora_idle = true;
+
+  Wire1.beginTransmission(I2C_DEV_ADDR);
+  Wire1.printf(rxpacket);
+  uint8_t error = Wire1.endTransmission(true);
+  Serial.printf("endTransmission: %u\n", error);
+
+  
   oled.clear();
   oled.setFont(ArialMT_Plain_10);
   oled.setTextAlignment(TEXT_ALIGN_LEFT);

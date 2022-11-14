@@ -17,6 +17,8 @@ SSD1306Wire oled(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED); /
 #define RX_TIMEOUT_VALUE           1000
 #define BUFFER_SIZE                30 // Define the payload size here
 
+#define LDR 7 // Sensor de Luz
+
 char txpacket[BUFFER_SIZE];
 char rxpacket[BUFFER_SIZE];
 double txNumber;
@@ -56,10 +58,12 @@ void loop()
   if (lora_idle == true)
   {
     delay(1000);
-    txNumber += 0.01;
-    sprintf(txpacket, "{ \"Nível\": \"%0.2f\"}", txNumber); //start a package
+    //txNumber += 0.01;
 
-    Serial.printf("\r\nsending packet \"%s\" , length %d\r\n", txpacket, strlen(txpacket));
+    int luminosidade = analogRead(LDR);
+    sprintf(txpacket, "{ \"Luz\": \"%i\"}", luminosidade); //start a package
+
+    Serial.printf("\r\nPacote enviado \"%s\" , length %d\r\n", txpacket, strlen(txpacket));
 
     Radio.Send( (uint8_t *)txpacket, strlen(txpacket) ); //send the package out
     lora_idle = false;
