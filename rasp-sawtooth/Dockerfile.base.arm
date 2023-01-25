@@ -1,0 +1,33 @@
+FROM ubuntu:focal
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update
+
+RUN apt-get install -y -q pkg-config
+
+RUN apt-get install -y -q apt-transport-https
+
+RUN apt-get install -y -q build-essential
+
+RUN apt-get install -y -q ca-certificates
+
+RUN apt-get install -y -q python3-pip
+
+RUN apt-get install -y -q automake
+
+RUN apt-get install -y -q libtool
+
+RUN apt-get install -y -q libffi-dev
+
+RUN apt-get install -y -q libgmp-dev
+
+RUN pip3 install --upgrade pip
+
+RUN pip3 install secp256k1 -v
+
+RUN pip3 install sawtooth-sdk
+
+RUN apt-get clean
+
+RUN rm -rf /var/lib/apt/lists/*

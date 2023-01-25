@@ -1,0 +1,6 @@
+FROM sawtooth-processor-base-arm
+
+EXPOSE 4004/tcp
+
+WORKDIR /project/smart_contract
+ENV PATH "$PATH:/project/smart_contract"
