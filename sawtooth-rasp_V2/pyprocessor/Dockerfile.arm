@@ -1,0 +1,9 @@
+FROM sawtooth-processor-base-arm
+
+EXPOSE 4004/tcp
+
+WORKDIR /project/iot/pyprocessor
+ENV PATH "$PATH:/project/iot/pyprocessor"
+
+#CMD bash -c './iot-tp'
+#CMD bash -c 'tail -f /dev/null\'
