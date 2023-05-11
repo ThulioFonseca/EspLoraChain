@@ -1,107 +1,142 @@
 
-/****** TX *********/
+// ----------------------------------- [ EspLoRa Transmitter ] ---------------------------------------- //
+//
+//   Autor: Thulio Fonseca
+//   Curso: Sistemas de Informação - IFMG - Ouro Branco
+//   Descrição: Dispositivo IoT para coleta e transmição de dados inerentes à qualidade do Leite. 
+//      
+
+// --------------------------------- [ Declaração de Bibliotecas ] ------------------------------------ //
 
 #include <SoftwareSerial.h>
 #include <OneWire.h>  
 #include <DallasTemperature.h>
 #include <RTClib.h>
+#include <ArduinoJson.h>
+
+// --------------------------------- [ Definição de nomes para pinos de I/O ] ------------------------- //
 
 #define LedStatus 02
 #define TxPin 15
 #define RxPin 13
 #define SensorTempPin 00
 
+// --------------------------------- [ Instânciação de Objetos ] -------------------------------------- //
+
 SoftwareSerial LoRaSerial(RxPin,TxPin);
 OneWire onewire(SensorTempPin);
 DallasTemperature SensorTemperatura(&onewire);
 RTC_DS1307 DS1307_RTC;
 
+// --------------------------------- [ Declaração de variáveis globais ] ------------------------------- //
+
 uint32_t deviceId = ESP.getChipId();
-String device = "deviceId: " + (String)deviceId + "; ";
 bool comunicacaoEstabelecida = false;
 bool SerialLogStatus = 0;
 
+// ------------------------------------------ [ Setup ] ------------------------------------------------ //
+
 void setup() {
+  
+// Definição de funções dos pinos I/O:
 
   pinMode(RxPin, INPUT);
   pinMode(TxPin, OUTPUT);
   pinMode(LedStatus, OUTPUT);
   pinMode(SensorTempPin, INPUT);
   
-  Serial.begin(9600);
-  SerialLog("Comunicacao serial iniciada!", SerialLogStatus);
+// Inicialização da comunicação Serial e I2C:
 
+  Serial.begin(9600);
+  Serial.flush();
+  
   LoRaSerial.begin(9600);
-  LoRaSerial.flush();
-  SerialLog("Módulo LoRa TX iniciado", SerialLogStatus);
+  LoRaSerial.flush();    
 
   if (!DS1307_RTC.begin()) {
     SerialLog("Não foi possivel iniciar o RTC", SerialLogStatus);
     while(1);
   }
-  
-  //DS1307_RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  
+
+// Ajuste inicial de relógio:
+
+  DS1307_RTC.adjust(DateTime(F(__DATE__), F(__TIME__)));  
   delay(2000);
-  
-  comunicacaoEstabelecida = ReceiverSearch();
+
+  SerialLog("Módulo EspLoRa TX iniciado", SerialLogStatus);
+
+// Buscar contato inicial com Receptor:
+
+  comunicacaoEstabelecida = BuscarConexao();
 
 }
+
+// ------------------------------------------ [ Loop ] ------------------------------------------------ //
 
 void loop() {
  
  while(comunicacaoEstabelecida){
 
-    int aguardaResposta = 0;
-    String payload = "";
-    String phSensor = "Sensor ph: 6.3;";
-    String tempSensor = "Sensor Temperatura: ";
-
+    //Coleta de Dados dos Sensores:
+    
     DateTime now = DS1307_RTC.now();
-    
+    int aguardaResposta = 0;
+    float phSensor = random(600, 700) / 100.0;  
     SensorTemperatura.requestTemperatures();
-    float temperatura = SensorTemperatura.getTempCByIndex(0);
-    tempSensor.concat(temperatura);
+    float tempSensor = SensorTemperatura.getTempCByIndex(0);
+
+    // Criação do "Payload" JSON:
     
-    payload = now.timestamp()+ " - " + device + phSensor + tempSensor;
-    SerialLog("Transmitindo dados: " + payload, SerialLogStatus);
-         
-    LoRaSerial.print(payload);
-    LoRaSerial.flush();
+    StaticJsonDocument<200> doc;
+    doc["timestamp"] = now.timestamp();
+    doc["deviceId"] = deviceId;
+    doc["ph"] = serialized(String(phSensor,2));
+    doc["temperatura"] = serialized(String(tempSensor,2)); 
+
+    // Envio do Payload via LoRa:
+    
+    serializeJson(doc, LoRaSerial);
+    LoRaSerial.flush();   
+    SerialLog("Transmitindo dados: ", SerialLogStatus);         
+    
+    // Aguardando Resposta do receptor:
     
     while(!LoRaSerial.available() >= 1 && aguardaResposta < 30) {
-      
+      digitalWrite(LedStatus, HIGH);
       SerialLog("Conexão perdida - aguardando " + (String)aguardaResposta, SerialLogStatus);
       delay(250);
-      aguardaResposta++;
-      
+      aguardaResposta++;      
     }
 
+    // Verifica se o tempo limite de espera de conexão foi atingido:
+    
     if(aguardaResposta >= 27){
       comunicacaoEstabelecida = false;
       continue;
     }
 
-    String receiverResponse = LoRaSerial.readString();
-    LoRaSerial.flush();
-    SerialLog("Resposta: " + receiverResponse, SerialLogStatus);     
+    // Lê a resposta do Receptor
+    
+    digitalWrite(LedStatus, LOW);
+    String respostaReceptor = LoRaSerial.readString();
+    SerialLog("Resposta: " + respostaReceptor, SerialLogStatus);     
     
   }
 
-  comunicacaoEstabelecida = ReceiverSearch();
+  //Tenta reconetar:
+  comunicacaoEstabelecida = BuscarConexao();
     
 }
 
-
-bool ReceiverSearch(){
+bool BuscarConexao(){
     
-  bool sucesso = false;
+  bool sucessoConexao = false;
   int tentativa = 0;
   int aguardarResposta = 0;
-  String receiverResponse = "no conection";
+  String respostaReceptor = "no conection";
   digitalWrite(LedStatus, HIGH); 
    
-  while(!sucesso){
+  while(!sucessoConexao){
 
     SerialLog("Enviando  ping, tentativa - " + (String)tentativa, SerialLogStatus);    
     LoRaSerial.print("ping");
@@ -122,16 +157,16 @@ bool ReceiverSearch(){
         
     if(LoRaSerial.available() >= 1){
       
-      receiverResponse = LoRaSerial.readString();
+      respostaReceptor = LoRaSerial.readString();
       LoRaSerial.flush();
       
-      if(receiverResponse == "pong"){
-        sucesso = true;
+      if(respostaReceptor == "pong"){
+        sucessoConexao = true;
         SerialLog("Comunicação estabelecida!", SerialLogStatus);       
         digitalWrite(LedStatus, LOW); 
       }
       else                
-        SerialLog("Resposta inválida: " + receiverResponse, SerialLogStatus);  
+        SerialLog("Resposta inválida: " + respostaReceptor, SerialLogStatus);  
         LoRaSerial.flush();            
     }
     
@@ -140,7 +175,7 @@ bool ReceiverSearch(){
 
   }
   
-  return sucesso;
+  return sucessoConexao;
     
 }
 
