@@ -27,15 +27,19 @@ def sensor_simulation(nloops):
         store_sensor_data(DEFAULT_SENSOR_PAYLOAD)
 
 def sensor_read_serial():
+    loop = 0
     ser = serial.Serial('/dev/ttyUSB0')
+    ser.flushInput()
         # Reads one byte of information
-    while True:
-        myBytes = ser.read(122)
-        # bufferBytes = ser.inWaiting()
-        # if bufferBytes:
-        #     myBytes = myBytes + ser.read(bufferBytes)
-        print(myBytes.decode("utf-8"))
-        print()
+    while loop < 5:
+        myBytes = ''
+        time.sleep(2)
+        bufferBytes = ser.inWaiting()
+        if bufferBytes > 85:
+             myBytes = ser.read(bufferBytes)
+             ser.flushInput()
+             store_sensor_data(myBytes.decode("utf-8"))
+             loop += 1
 
 def get_sensor_data():
     key_file = _get_keyfile(DISTRIBUTION_NAME)
@@ -45,20 +49,6 @@ def get_sensor_data():
         print("\n{} have a state = {}\n".format(DISTRIBUTION_NAME, data.decode()))
     else:
         raise Exception("state not found: {}".format(DISTRIBUTION_NAME))
-
-# def get_sensor_history():
-#     key_file = _get_keyfile(DISTRIBUTION_NAME)
-#     iot_cli = IoTClient(baseUrl=DEFAULT_URL, keyFile=key_file)
-#     data = iot_cli.get_sensor_history()
-
-#     if data is not None:
-#         for i in data:
-#             try:
-#                 print(i.decode())
-#             except:
-#                 pass
-#     else:
-#         raise Exception("history not found: {}".format(client))
 
 def get_sensor_history():
     key_file = _get_keyfile(DISTRIBUTION_NAME)
@@ -70,19 +60,15 @@ def get_sensor_history():
             try:
                 messageData = i.decode().split("store_sensor_data,")
                 sensorDataObj = json.loads(messageData[1])
-                tz = pytz.timezone('America/Sao_Paulo')
-                sensorDateTime = datetime.fromtimestamp(int(sensorDataObj["timestamp"]), tz)
-
                 print('')
-                print("Id do Dispositivo: " + sensorDataObj["deviceId"])
-                print("Dados dos Sensores: ph = " + sensorDataObj["sensorData"]["ph"] + " / Temperatura = " + sensorDataObj["sensorData"]["temperature"])
-                print("Data: ", sensorDateTime)
+                data = "Id do Dispositivo: {deviceId} \nDados dos Sensores: \nph = {ph}\nTemperatura =  {temperatura}\nData: {timestamp}".format(**sensorDataObj)
+                print(data)
                 print('')
 
-            except:
-                pass
+            except Exception as e :
+                print(e)
     else:
-        raise Exception("history not found: {}".format(client))
+        raise Exception("history not found: {}".format(IoTClient))
 
 
 def main():
