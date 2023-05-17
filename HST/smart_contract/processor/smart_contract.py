@@ -1,5 +1,6 @@
 import traceback
 import sys
+import json
 import hashlib
 
 from sawtooth_sdk.processor.handler import TransactionHandler
@@ -14,8 +15,10 @@ def _hash(data):
     '''Compute the SHA-512 hash and return the result as hex characters.'''
     return hashlib.sha512(data).hexdigest()
 
+
 # Prefix for iot is the first six hex digits of SHA-512(TF name).
 iot_namespace = _hash(FAMILY_NAME.encode('utf-8'))[0:6]
+
 
 class IoTTransactionHandler(TransactionHandler):
 
@@ -34,11 +37,11 @@ class IoTTransactionHandler(TransactionHandler):
     def namespaces(self):
         return [self._namespace_prefix]
 
-    def apply(self, transaction, context):                                                
-        
+    def apply(self, transaction, context):
+
         # Get the payload and extract iot-specific information.
         header = transaction.header
-        payload_list = transaction.payload.decode().split(",")
+        payload_list = transaction.payload.decode().split("@")
         operation = payload_list[0]
         amount = payload_list[1]
 
@@ -46,6 +49,31 @@ class IoTTransactionHandler(TransactionHandler):
         from_key = header.signer_public_key
 
         if operation == "store_sensor_data":
+            sensorDataObj = json.loads(amount)
+            statusMedicao = "Aprovado"
+
+            if(sensorDataObj.get("temperatura")>= 20 or sensorDataObj.get("ph")>= 6.3):
+                statusMedicao = "Reprovado"
+
+            estampa = {                
+                "Produtor": "Thulio Fernando Andrade Fonseca",
+                "IdProdutor": "123456789",
+                "CodPropriedade": "123",
+                "CodReservatorio": "123456",
+                "StatusMedicao": statusMedicao,
+                "Medicao": {
+                    "deviceId": sensorDataObj.get("deviceId"),
+                    "timestamp": sensorDataObj.get("timestamp"),
+                    "ph": sensorDataObj.get("ph"),
+                    "temperatura": sensorDataObj.get("temperatura")
+                },
+                "MotivoReprovacao": [
+                    "temperatura"
+                ]
+            }
+
+            amount = json.dumps(estampa)
+
             self._store_sensor_data(context, amount, from_key)
 
     def _store_sensor_data(self, context, amount, from_key):
@@ -59,6 +87,7 @@ class IoTTransactionHandler(TransactionHandler):
 
     def _get_wallet_address(self, from_key):
         return _hash(FAMILY_NAME.encode('utf-8'))[0:6] + _hash(from_key.encode('utf-8'))[0:64]
+
 
 def main(destino):
     '''Entry-point function for the sensor transaction processor.'''

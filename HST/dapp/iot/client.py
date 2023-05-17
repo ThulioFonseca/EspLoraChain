@@ -107,7 +107,7 @@ class IoTClient(object):
         rawPayload = action
 
         for val in values:
-            rawPayload = ",".join([rawPayload, str(val)])
+            rawPayload = "@".join([rawPayload, str(val)])
 
         payload = rawPayload.encode()
 

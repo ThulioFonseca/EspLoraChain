@@ -58,12 +58,12 @@ def get_sensor_history():
     if data is not None:
         for i in data:
             try:
-                messageData = i.decode().split("store_sensor_data,")
-                sensorDataObj = json.loads(messageData[1])
-                print('')
-                data = "Id do Dispositivo: {deviceId} \nDados dos Sensores: \nph = {ph}\nTemperatura =  {temperatura}\nData: {timestamp}".format(**sensorDataObj)
-                print(data)
-                print('')
+                messageData = i.decode()
+                #sensorDataObj = json.loads(messageData[1])
+                print(messageData)
+                # data = "Id do Dispositivo: {deviceId} \nDados dos Sensores: \nph = {ph}\nTemperatura =  {temperatura}\nData: {timestamp}".format(**sensorDataObj)
+                # print(data)
+                print("")
 
             except Exception as e :
                 print(e)
