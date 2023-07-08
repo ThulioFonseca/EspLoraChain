@@ -37,44 +37,48 @@ class IoTTransactionHandler(TransactionHandler):
     def namespaces(self):
         return [self._namespace_prefix]
 
-    def apply(self, transaction, context):
+   def apply(self, transaction, context):
 
-        # Get the payload and extract iot-specific information.
-        header = transaction.header
-        payload_list = transaction.payload.decode().split("@")
-        operation = payload_list[0]
-        amount = payload_list[1]
+    # Get the payload and extract IoT-specific information.
+    header = transaction.header
+    payload_list = transaction.payload.decode().split("@")
+    operation = payload_list[0]
+    amount = payload_list[1]
 
-        # Get the public key sent from the client.
-        from_key = header.signer_public_key
+    # Get the public key sent from the client.
+    from_key = header.signer_public_key
 
-        if operation == "store_sensor_data":
-            sensorDataObj = json.loads(amount)
-            statusMedicao = "Aprovado"
+    if operation == "store_sensor_data":
+        sensorDataObj = json.loads(amount)
+        statusMedicao = "Aprovado"
+        motivoReprovacao = []
 
-            if(sensorDataObj.get("temperatura")>= 20 or sensorDataObj.get("ph")>= 6.3):
-                statusMedicao = "Reprovado"
+        if sensorDataObj.get("temperatura") > 4:
+            statusMedicao = "Reprovado"
+            motivoReprovacao.append("temperatura")
 
-            estampa = {                
-                "Produtor": "Thulio Fernando Andrade Fonseca",
-                "IdProdutor": "123456789",
-                "CodPropriedade": "123",
-                "CodReservatorio": "123456",
-                "StatusMedicao": statusMedicao,
-                "Medicao": {
-                    "deviceId": sensorDataObj.get("deviceId"),
-                    "timestamp": sensorDataObj.get("timestamp"),
-                    "ph": sensorDataObj.get("ph"),
-                    "temperatura": sensorDataObj.get("temperatura")
-                },
-                "MotivoReprovacao": [
-                    "temperatura"
-                ]
-            }
+        if sensorDataObj.get("ph") < 6.6:
+            statusMedicao = "Reprovado"
+            motivoReprovacao.append("ph")
 
-            amount = json.dumps(estampa)
+        estampa = {                
+            "Produtor": "Thulio Fernando Andrade Fonseca",
+            "IdProdutor": "123456789",
+            "CodPropriedade": "123",
+            "CodReservatorio": "123456",
+            "StatusMedicao": statusMedicao,
+            "Medicao": {
+                "deviceId": sensorDataObj.get("deviceId"),
+                "timestamp": sensorDataObj.get("timestamp"),
+                "ph": sensorDataObj.get("ph"),
+                "temperatura": sensorDataObj.get("temperatura")
+            },
+            "MotivoReprovacao": motivoReprovacao
+        }
 
-            self._store_sensor_data(context, amount, from_key)
+        amount = json.dumps(estampa)
+
+        self._store_sensor_data(context, amount, from_key)
 
     def _store_sensor_data(self, context, amount, from_key):
         wallet_address = self._get_wallet_address(from_key)
